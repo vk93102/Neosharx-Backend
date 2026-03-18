@@ -1,0 +1,49 @@
+# =============================================================================
+# Dockerfile.dev — NeoSharX Backend (Development)
+#
+# Optimised for fast iteration:
+#   • Source code mounted as volume (no rebuild on code change)
+#   • Django dev server with auto-reload
+#   • All dev + test dependencies included
+#
+# Build:  docker build -f Dockerfile.dev -t neosharx-backend:dev .
+# =============================================================================
+
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    DJANGO_SETTINGS_MODULE=backend.settings \
+    PORT=8000
+
+WORKDIR /app
+
+# System deps
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        libpq-dev \
+        curl \
+        git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python deps (includes dev/test packages)
+COPY requirements.txt requirements_prod.txt ./
+RUN pip install --upgrade pip \
+    && pip install --no-cache-dir -r requirements.txt \
+    && pip install --no-cache-dir \
+        pytest \
+        pytest-django \
+        pytest-cov \
+        pytest-xdist \
+        coverage \
+        flake8 \
+        ipython \
+        django-extensions
+
+# App source is volume-mounted at runtime — copy for layer caching only
+COPY . .
+
+EXPOSE ${PORT}
+
+# Default: run dev server with live reload
+CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
