@@ -9,7 +9,6 @@ SharXathon hackathons, TechNews articles, NeoProjects, and StartupStories.
 import pytest
 from datetime import date, time, timedelta
 from django.utils import timezone
-from django.utils.text import slugify
 
 pytestmark = pytest.mark.django_db
 

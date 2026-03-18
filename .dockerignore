@@ -1,0 +1,85 @@
+# =============================================================================
+# .dockerignore — NeoSharX Backend
+# Excludes files that must not be sent to the Docker build context.
+# =============================================================================
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# CI / GitHub Actions
+.github
+
+# Python bytecode
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments
+.venv
+venv
+env
+.env.local
+ENV
+
+# Test artefacts
+.pytest_cache
+.coverage
+coverage.xml
+htmlcov
+test-results
+*.xml
+
+# Django dev artefacts
+*.sqlite3
+db.sqlite3
+*.log
+staticfiles/
+media/
+
+# Docker files (don't include compose files in the image)
+docker-compose*.yml
+Dockerfile*
+.dockerignore
+
+# IDE / editor
+.vscode
+.idea
+*.swp
+*.swo
+.DS_Store
+
+# Node (if any frontend tooling exists)
+node_modules
+npm-debug.log*
+yarn-debug.log*
+
+# Build artefacts
+*.egg-info
+dist
+build
+*.whl
+
+# Secrets — never include real .env files
+.env
+.env.prod
+.env.staging
+*.pem
+*.key
+*.crt
+
+# Docs
+*.md
+docs/
+DEPLOYMENT_COMPLETE_GUIDE.md
+RENDER_DEPLOYMENT_GUIDE.md
+
+# One-off scripts
+add_*.py
+create_*.py
+fix_*.py
+migrate_with_debug.py
+verify_*.py
+test_all_endpoints.sh

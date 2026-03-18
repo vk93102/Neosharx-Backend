@@ -1,0 +1,110 @@
+# =============================================================================
+# docker-compose.yml — NeoSharX Backend (Development Stack)
+#
+# Services:
+#   db       → PostgreSQL 16
+#   redis    → Redis 7 (cache / Celery broker placeholder)
+#   web      → Django dev server (hot-reload, mounted source)
+#   pgadmin  → pgAdmin4 for DB inspection (optional, profile=tools)
+#
+# Usage:
+#   docker compose up                     # Start all core services
+#   docker compose --profile tools up     # Also start pgAdmin
+#   docker compose run --rm web pytest    # Run test suite
+#   docker compose down -v                # Stop & remove volumes
+# =============================================================================
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL Database
+  # ---------------------------------------------------------------------------
+  db:
+    image: postgres:16-alpine
+    container_name: neosharx_db_dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-neosharx_dev}
+      POSTGRES_USER: ${POSTGRES_USER:-neosharx_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devpassword}
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-neosharx_user} -d ${POSTGRES_DB:-neosharx_dev}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # Redis (cache / optional task queue)
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: neosharx_redis_dev
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # Django Web Server (development)
+  # ---------------------------------------------------------------------------
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: neosharx_web_dev
+    restart: unless-stopped
+    command: >
+      sh -c "python manage.py migrate --run-syncdb &&
+             python manage.py runserver 0.0.0.0:8000"
+    volumes:
+      - .:/app                        # Live code reload
+      - static_dev:/app/staticfiles
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-neosharx_user}:${POSTGRES_PASSWORD:-devpassword}@db:5432/${POSTGRES_DB:-neosharx_dev}
+      REDIS_URL: redis://redis:6379/0
+      DEBUG: "true"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ---------------------------------------------------------------------------
+  # pgAdmin4 — optional DB browser (enable with: --profile tools)
+  # ---------------------------------------------------------------------------
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: neosharx_pgadmin
+    profiles: [tools]
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@neosharx.io}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-adminpassword}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+    ports:
+      - "5050:80"
+    depends_on:
+      - db
+
+volumes:
+  postgres_dev_data:
+    name: neosharx_postgres_dev
+  static_dev:
+    name: neosharx_static_dev
+
+networks:
+  default:
+    name: neosharx_dev_network

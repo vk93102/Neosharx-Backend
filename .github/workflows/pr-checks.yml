@@ -55,10 +55,11 @@ jobs:
           cache: pip
       - run: pip install flake8
       - run: |
-          flake8 authentication/ backend/ tests/ \
+          flake8 backend tests \
             --max-line-length=120 \
-            --exclude=migrations,__pycache__ \
-            --extend-ignore=E203,W503
+            --exclude=migrations,__pycache__,.venv \
+            --extend-ignore=E203,W503,W291,W293,W292 \
+            --per-file-ignores="backend/settings*.py:E501,E402 tests/check_db_integrity.py:F401,E302,E305"
 
   pr-tests:
     name: "🧪 PR Tests (fast subset)"

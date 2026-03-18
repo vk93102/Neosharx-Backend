@@ -4,31 +4,12 @@ conftest.py — Pytest fixtures shared across the entire test suite.
 All fixtures use Django's TestCase / pytest-django semantics so every test
 runs inside a database transaction that is rolled back after each test,
 keeping the test database clean.
+
+Settings are provided by backend.test_settings (see pytest.ini).
+No settings manipulation is needed here.
 """
 
 import pytest
-import django
-from django.conf import settings
-
-# ---------------------------------------------------------------------------
-# Minimal settings override so tests can run without a real .env file
-# ---------------------------------------------------------------------------
-def pytest_configure(config):
-    """Override dangerous/external settings with safe test values."""
-    settings.TWILIO_ACCOUNT_SID = "ACtest000000000000000000000000000000"
-    settings.TWILIO_AUTH_TOKEN = "test_token_000000000000000000000000"
-    settings.TWILIO_VERIFY_SERVICE_SID = "VAtest000000000000000000000000000000"
-    settings.USE_MOCK_OTP = True
-    settings.MOCK_OTP_CODE = "123456"
-    settings.DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.sqlite3",
-            "NAME": ":memory:",
-        }
-    }
-    settings.SECRET_KEY = "test-secret-key-not-for-production"
-    settings.DEBUG = True
-    settings.ALLOWED_HOSTS = ["*"]
 
 
 # ---------------------------------------------------------------------------

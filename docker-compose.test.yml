@@ -1,0 +1,95 @@
+# =============================================================================
+# docker-compose.test.yml — NeoSharX Backend (Test Runner)
+#
+# Spins up an isolated stack for running the full pytest suite in Docker.
+# Used by CI/CD and for local "clean room" test runs.
+#
+# Usage:
+#   docker compose -f docker-compose.test.yml up --abort-on-container-exit
+#   docker compose -f docker-compose.test.yml run --rm test pytest tests/ -v
+#   docker compose -f docker-compose.test.yml down -v   # clean up
+# =============================================================================
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # Ephemeral test database
+  # ---------------------------------------------------------------------------
+  db_test:
+    image: postgres:16-alpine
+    container_name: neosharx_db_test
+    restart: "no"
+    environment:
+      POSTGRES_DB: neosharx_test
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_password
+    # Keep in memory for speed — no volume needed
+    tmpfs:
+      - /var/lib/postgresql/data
+    expose:
+      - "5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test_user -d neosharx_test"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - test_network
+
+  # ---------------------------------------------------------------------------
+  # Test runner
+  # ---------------------------------------------------------------------------
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: neosharx_test_runner
+    restart: "no"
+    command: >
+      sh -c "
+        echo '⏳ Running migrations...' &&
+        python manage.py migrate --run-syncdb &&
+        echo '🧪 Running test suite...' &&
+        pytest tests/
+          --cov=authentication
+          --cov-report=term-missing
+          --cov-report=xml:/app/test-results/coverage.xml
+          --cov-report=html:/app/test-results/htmlcov
+          --cov-fail-under=60
+          -v
+          --tb=short
+          --junitxml=/app/test-results/junit.xml
+      "
+    volumes:
+      - .:/app
+      - test_results:/app/test-results
+    environment:
+      # Override all external service vars with safe test values
+      SECRET_KEY: "docker-test-secret-key-not-for-production"
+      DEBUG: "true"
+      ALLOWED_HOSTS: "localhost,127.0.0.1,testserver"
+      DATABASE_URL: "postgresql://test_user:test_password@db_test:5432/neosharx_test"
+      TWILIO_ACCOUNT_SID: "ACtest000000000000000000000000000000"
+      TWILIO_AUTH_TOKEN: "test_token_000000000000000000000000"
+      TWILIO_VERIFY_SERVICE_SID: "VAtest000000000000000000000000000000"
+      USE_MOCK_OTP: "true"
+      MOCK_OTP_CODE: "123456"
+      LINKEDIN_CLIENT_ID: "ci_linkedin_client_id"
+      LINKEDIN_CLIENT_SECRET: "ci_linkedin_client_secret"
+      LINKEDIN_REDIRECT_URI: "http://localhost:8000/auth/linkedin/callback.html"
+      GOOGLE_CLIENT_ID: "ci_google_client_id"
+      GOOGLE_CLIENT_SECRET: "ci_google_client_secret"
+      GOOGLE_REDIRECT_URI: "http://localhost:8000/auth/google/callback.html"
+    depends_on:
+      db_test:
+        condition: service_healthy
+    networks:
+      - test_network
+
+volumes:
+  test_results:
+    name: neosharx_test_results
+
+networks:
+  test_network:
+    name: neosharx_test_network
